@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction File Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .transaction-card {
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .error-message {
+            color: #dc3545;
+            margin-top: 0.5rem;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="text-center mb-4">Transaction File Converter</h1>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <form id="converterForm">
+                            <div class="mb-3">
+                                <label for="fileType" class="form-label">File Type</label>
+                                <select class="form-select" id="fileType" required>
+                                    <option value="">Select file type...</option>
+                                    <option value="visa">VISA</option>
+                                    <option value="mastercard">Mastercard</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="fileContent" class="form-label">File Content</label>
+                                <textarea class="form-control" id="fileContent" rows="6" required
+                                    placeholder="Paste your transaction file content here..."></textarea>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">Convert</button>
+                            </div>
+                        </form>
+                        
+                        <div class="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        
+                        <div id="errorMessage" class="error-message"></div>
+                        
+                        <div id="results" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('converterForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileType = document.getElementById('fileType').value;
+            const fileContent = document.getElementById('fileContent').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const results = document.getElementById('results');
+            const loading = document.querySelector('.loading');
+            
+            // Reset UI
+            errorMessage.textContent = '';
+            results.innerHTML = '';
+            loading.style.display = 'block';
+            
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ type: fileType, content: fileContent })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Conversion failed');
+                }
+                
+                // Display results
+                results.innerHTML = data.transactions.map(tx => `
+                    <div class="card transaction-card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Date:</strong> ${tx.date}</p>
+                                    <p class="mb-1"><strong>Amount:</strong> ${tx.amount}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Merchant:</strong> ${tx.merchant}</p>
+                                    <p class="mb-1"><strong>Card:</strong> ****${tx.card}</p>
+                                    <p class="mb-1"><strong>Transaction ID:</strong> ${tx.transaction_id}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                errorMessage.textContent = error.message;
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html> 
