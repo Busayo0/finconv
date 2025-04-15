@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from converters.t057 import parse_t057_fixed_width
 from converters.iso8583 import parse_iso8583_xml, decode_field_48
+from converters.t113 import parse_t113_fixed_width
+from converters.ipm import parse_ipm_text_dump
 
 # ---------------- Binary Fallback -------------------
 def parse_binary_file(uploaded_file):
@@ -75,7 +77,11 @@ if uploaded_file:
                 st.download_button("⬇️ Download CSV", csv, file_name="iso8583_fields.csv", mime="text/csv")
 
         # T057 fixed-width
-        elif filename.endswith(".001") or filename.startswith("t057"):
+        elif (
+            filename.endswith(".001") or
+            filename.startswith("t057") or
+            filename.endswith(".t057")
+        ):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             lines = content.splitlines()
             df = parse_t057_fixed_width(lines)
@@ -85,6 +91,29 @@ if uploaded_file:
 
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button("⬇️ Download CSV", csv, file_name="t057_parsed.csv", mime="text/csv")
+
+        # T113 file
+        elif "t113" in filename:
+            content = uploaded_file.read().decode("utf-8", errors="ignore")
+            lines = content.splitlines()
+            df = parse_t113_fixed_width(lines)
+
+            st.success("✅ T113 acknowledgment file parsed successfully")
+            st.dataframe(df)
+
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download CSV", csv, file_name="t113_parsed.csv", mime="text/csv")
+
+        # IPM Message Dump
+        elif "ipm" in filename and filename.endswith(".txt"):
+            content = uploaded_file.read().decode("utf-8", errors="ignore")
+            df = parse_ipm_text_dump(content)
+
+            st.success("✅ IPM message dump parsed successfully")
+            st.dataframe(df)
+
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download CSV", csv, file_name="ipm_parsed.csv", mime="text/csv")
 
         # Binary file fallback
         else:
