@@ -10,6 +10,67 @@ def parse_binary_file(uploaded_file):
         "Size (bytes)": len(binary_data)
     }])
 
+# ---------------- Field Name Mapper -------------------
+def get_iso_field_name(field_id):
+    iso_field_names = {
+        "0": "MTI",
+        "1": "Bitmap",
+        "2": "Primary Account Number",
+        "3": "Processing Code",
+        "4": "Transaction Amount",
+        "5": "Settlement Amount",
+        "6": "Cardholder Billing Amount",
+        "7": "Transmission Date and Time",
+        "8": "Cardholder Fee",
+        "9": "Settlement Conversion Rate",
+        "10": "Cardholder Billing Conversion Rate",
+        "11": "STAN",
+        "12": "Local Time",
+        "13": "Local Date",
+        "14": "Expiration Date",
+        "15": "Settlement Date",
+        "18": "Merchant Category Code",
+        "22": "POS Entry Mode",
+        "23": "Card Sequence Number",
+        "24": "Function Code",
+        "25": "POS Condition Code",
+        "26": "POS Capture Code",
+        "28": "Amount, Transaction Fee",
+        "30": "Amount, Processing Fee",
+        "31": "Acquirer Reference Data",
+        "32": "Acquiring Institution ID",
+        "33": "Forwarding Institution ID",
+        "35": "Track 2 Data",
+        "37": "Retrieval Reference Number",
+        "38": "Authorization ID",
+        "39": "Response Code",
+        "41": "Terminal ID",
+        "42": "Merchant ID",
+        "43": "Card Acceptor Name/Location",
+        "44": "Additional Response Data",
+        "48": "Additional Data",
+        "49": "Transaction Currency Code",
+        "52": "PIN Data",
+        "54": "Additional Amounts",
+        "55": "EMV Data",
+        "56": "Reserved ISO",
+        "59": "E-commerce Indicator",
+        "60": "Advice Reason Code",
+        "61": "POS Data",
+        "63": "Private Reserved",
+        "70": "Network Management Information Code",
+        "71": "Message Number",
+        "72": "Data Record",
+        "73": "Date Action",
+        "90": "Original Data Elements",
+        "94": "Replacement Amounts or Response Indicator",
+        "95": "Replacement Amounts",
+        "100": "Receiving Institution ID",
+        "102": "Account Identification 1",
+        "103": "Account Identification 2"
+    }
+    return iso_field_names.get(field_id, f"Field {field_id}")
+
 # ---------------- Streamlit App -------------------
 st.set_page_config(page_title="File Format Analyzer", layout="centered")
 st.title("📁 File Format Analyzer")
@@ -22,6 +83,15 @@ if uploaded_file:
         if filename.endswith(".xml"):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             df = parse_iso8583_xml(content)
+
+            # Add readable field names
+            df["Field Name"] = df["Field ID"].apply(get_iso_field_name)
+            df = df[["Message #", "Field ID", "Field Name", "Value"]]
+
+            # Reorder key fields first if they exist
+            key_order = ["MTI", "Primary Account Number", "Processing Code", "Transaction Amount", "Local Time", "Response Code"]
+            df["Field Rank"] = df["Field Name"].apply(lambda name: key_order.index(name) if name in key_order else 999)
+            df = df.sort_values(by=["Message #", "Field Rank", "Field ID"]).drop(columns="Field Rank")
 
             st.success("✅ ISO 8583 fields extracted successfully")
             st.dataframe(df)
