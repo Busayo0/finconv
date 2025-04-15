@@ -1,126 +1,29 @@
-import streamlit as st
 import pandas as pd
-from converters import parse_t057_fixed_width, parse_iso8583_xml, decode_field_48
+import xml.etree.ElementTree as ET
 
-# ---------------- Binary Fallback -------------------
-def parse_binary_file(uploaded_file):
-    binary_data = uploaded_file.read()
-    return pd.DataFrame([{
-        "Hex Dump": binary_data.hex(),
-        "Size (bytes)": len(binary_data)
-    }])
+def parse_iso8583_xml(xml_content):
+    tree = ET.ElementTree(ET.fromstring(xml_content))
+    root = tree.getroot()
 
-# ---------------- Field Name Mapper -------------------
-def get_iso_field_name(field_id):
-    iso_field_names = {
-        "0": "MTI",
-        "1": "Bitmap",
-        "2": "Primary Account Number",
-        "3": "Processing Code",
-        "4": "Transaction Amount",
-        "5": "Settlement Amount",
-        "6": "Cardholder Billing Amount",
-        "7": "Transmission Date and Time",
-        "8": "Cardholder Fee",
-        "9": "Settlement Conversion Rate",
-        "10": "Cardholder Billing Conversion Rate",
-        "11": "STAN",
-        "12": "Local Time",
-        "13": "Local Date",
-        "14": "Expiration Date",
-        "15": "Settlement Date",
-        "18": "Merchant Category Code",
-        "22": "POS Entry Mode",
-        "23": "Card Sequence Number",
-        "24": "Function Code",
-        "25": "POS Condition Code",
-        "26": "POS Capture Code",
-        "28": "Amount, Transaction Fee",
-        "30": "Amount, Processing Fee",
-        "31": "Acquirer Reference Data",
-        "32": "Acquiring Institution ID",
-        "33": "Forwarding Institution ID",
-        "35": "Track 2 Data",
-        "37": "Retrieval Reference Number",
-        "38": "Authorization ID",
-        "39": "Response Code",
-        "41": "Terminal ID",
-        "42": "Merchant ID",
-        "43": "Card Acceptor Name/Location",
-        "44": "Additional Response Data",
-        "48": "Additional Data",
-        "49": "Transaction Currency Code",
-        "52": "PIN Data",
-        "54": "Additional Amounts",
-        "55": "EMV Data",
-        "56": "Reserved ISO",
-        "59": "E-commerce Indicator",
-        "60": "Advice Reason Code",
-        "61": "POS Data",
-        "63": "Private Reserved",
-        "70": "Network Management Information Code",
-        "71": "Message Number",
-        "72": "Data Record",
-        "73": "Date Action",
-        "90": "Original Data Elements",
-        "94": "Replacement Amounts or Response Indicator",
-        "95": "Replacement Amounts",
-        "100": "Receiving Institution ID",
-        "102": "Account Identification 1",
-        "103": "Account Identification 2"
-    }
-    return iso_field_names.get(field_id, f"Field {field_id}")
+    messages = []
+    if root.tag == "isomsg":
+        roots = [root]
+    else:
+        roots = root.findall("isomsg")
 
-# ---------------- Streamlit App -------------------
-st.set_page_config(page_title="File Format Analyzer", layout="centered")
-st.title("📁 File Format Analyzer")
+    for i, msg in enumerate(roots):
+        for field in msg.findall("field"):
+            messages.append({
+                "Message #": i + 1,
+                "Field ID": field.attrib.get("id"),
+                "Value": field.attrib.get("value")
+            })
 
-uploaded_file = st.file_uploader("Upload a file (.xml, .dat, .bin, .001)", type=["xml", "dat", "bin", "001", "txt"])
+    return pd.DataFrame(messages)
 
-if uploaded_file:
-    filename = uploaded_file.name.lower()
-    try:
-        if filename.endswith(".xml"):
-            content = uploaded_file.read().decode("utf-8", errors="ignore")
-            df = parse_iso8583_xml(content)
-
-            # Add readable field names
-            df["Field Name"] = df["Field ID"].apply(get_iso_field_name)
-            df = df[["Message #", "Field ID", "Field Name", "Value"]]
-
-            # Reorder key fields first if they exist
-            key_order = ["MTI", "Primary Account Number", "Processing Code", "Transaction Amount", "Local Time", "Response Code"]
-            df["Field Rank"] = df["Field Name"].apply(lambda name: key_order.index(name) if name in key_order else 999)
-            df = df.sort_values(by=["Message #", "Field Rank", "Field ID"]).drop(columns="Field Rank")
-
-            st.success("✅ ISO 8583 fields extracted successfully")
-            st.dataframe(df)
-
-            for msg_id in df["Message #"].unique():
-                field_48_row = df[(df["Message #"] == msg_id) & (df["Field ID"] == "48")]
-                if not field_48_row.empty:
-                    st.subheader(f"🔍 Decoded Field 48 (Message #{msg_id})")
-                    decoded = decode_field_48(field_48_row.iloc[0]["Value"])
-                    st.dataframe(pd.DataFrame(decoded))
-
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download CSV", csv, file_name="iso8583_fields.csv", mime="text/csv")
-
-        elif filename.endswith(".001") or filename.startswith("t057"):
-            content = uploaded_file.read().decode("utf-8", errors="ignore")
-            lines = content.splitlines()
-            df = parse_t057_fixed_width(lines)
-
-            st.success("✅ T057 file parsed successfully")
-            st.dataframe(df)
-
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download CSV", csv, file_name="t057_parsed.csv", mime="text/csv")
-
-        else:
-            st.subheader("📦 Binary File Summary")
-            df_bin = parse_binary_file(uploaded_file)
-            st.dataframe(df_bin)
-
-    except Exception as e:
-        st.error(f"An error occurred while parsing the file: {e}")
+def decode_field_48(value):
+    return [
+        {"Label": "Sample Code", "Value": value[:10]},
+        {"Label": "Reference", "Value": value[10:20]},
+        {"Label": "Transaction Info", "Value": value[20:30]},
+    ]
