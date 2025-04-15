@@ -86,17 +86,19 @@ if uploaded_file:
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             df = parse_iso8583_xml(content)
 
-            # Add readable field names
+           # Add readable field names
             df["Field Name"] = df["Field ID"].apply(get_iso_field_name)
-            df = df[["Message #", "Field ID", "Field Name", "Value"]]
+            df = df[["Message #", "Field Name", "Value"]]
 
-            # Reorder key fields first if they exist
-            key_order = ["MTI", "Primary Account Number", "Processing Code", "Transaction Amount", "Local Time", "Response Code"]
-            df["Field Rank"] = df["Field Name"].apply(lambda name: key_order.index(name) if name in key_order else 999)
-            df = df.sort_values(by=["Message #", "Field Rank", "Field ID"]).drop(columns="Field Rank")
+            # Pivot to make each field name a column
+            df_pivot = df.pivot(index="Message #", columns="Field Name", values="Value").reset_index()
 
             st.success("✅ ISO 8583 fields extracted successfully")
-            st.dataframe(df)
+            st.dataframe(df_pivot)
+
+            csv = df_pivot.to_csv(index=False).encode("utf-8")
+            st.download_button("⬇️ Download CSV", csv, file_name="iso8583_fields_pivoted.csv", mime="text/csv")
+
 
             for msg_id in df["Message #"].unique():
                 field_48_row = df[(df["Message #"] == msg_id) & (df["Field ID"] == "48")]
