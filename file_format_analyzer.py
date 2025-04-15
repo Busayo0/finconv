@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-from converters import parse_t057_fixed_width, parse_iso8583_xml, decode_field_48
+from converters.t057 import parse_t057_fixed_width
+from converters.iso8583 import parse_iso8583_xml, decode_field_48
+
 
 # ---------------- Binary Fallback -------------------
 def parse_binary_file(uploaded_file):
