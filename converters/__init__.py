@@ -2,6 +2,7 @@ from .t057 import parse_t057_fixed_width
 from .iso8583 import parse_iso8583_xml, decode_field_48
 from .t113 import parse_t113_fixed_width
 from .ipm import parse_ipm_text_dump
+from .visa_ni import parse_visa_ni_file
 
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "parse_iso8583_xml",
     "decode_field_48",
     "parse_t113_fixed_width",
-    "parse_ipm_text_dump"
+    "parse_ipm_text_dump",
+    "parse_visa_ni_file"
 ]
