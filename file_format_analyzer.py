@@ -4,6 +4,26 @@ from converters.t057 import parse_t057_fixed_width
 from converters.iso8583 import parse_iso8583_xml, decode_field_48
 from converters.t113 import parse_t113_fixed_width
 from converters.ipm import parse_ipm_text_dump
+from converters.visa_ni import parse_visa_ni_file
+
+
+# ---------------- Visa NI Parser -------------------
+def parse_visa_ni_file(uploaded_file):
+    lines = [line.strip() for line in uploaded_file.readlines() if line.strip()]
+
+    def mask_pan(pan: str) -> str:
+        return pan[:4] + '*' * (len(pan) - 8) + pan[-4:] if len(pan) >= 10 else '*' * len(pan)
+
+    parsed_rows = []
+    for line in lines:
+        parts = line.decode("utf-8", errors="ignore").split("|")
+        if parts:
+            parts[0] = mask_pan(parts[0])
+        parsed_rows.append(parts)
+
+    df = pd.DataFrame(parsed_rows)
+    df_export = pd.concat([pd.DataFrame([[""] * len(df.columns)]), df], ignore_index=True)
+    return df_export
 
 # ---------------- Binary Fallback -------------------
 def parse_binary_file(uploaded_file):
@@ -42,7 +62,7 @@ def get_iso_field_name(field_id):
 st.set_page_config(page_title="File Format Analyzer", layout="centered")
 st.title("📁 File Format Analyzer")
 
-uploaded_file = st.file_uploader("Upload a file (.xml, .dat, .bin, .001)", type=["xml", "dat", "bin", "001", "txt"])
+uploaded_file = st.file_uploader("Upload a file (.xml, .dat, .bin, .001, .txt)", type=["xml", "dat", "bin", "001", "txt"])
 
 if uploaded_file:
     filename = uploaded_file.name.lower()
@@ -55,17 +75,13 @@ if uploaded_file:
             if "Field ID" not in df.columns or "Value" not in df.columns:
                 st.error("❌ File does not contain expected ISO 8583 fields.")
             else:
-                # Map field IDs to readable names
                 df["Field Name"] = df["Field ID"].apply(get_iso_field_name)
                 df = df[["Message #", "Field Name", "Value"]]
-
-                # Pivot table: Field Names become columns
                 df_pivot = df.pivot(index="Message #", columns="Field Name", values="Value").reset_index()
 
                 st.success("✅ ISO 8583 fields extracted successfully")
                 st.dataframe(df_pivot)
 
-                # Optional: decode Field 48
                 if "Additional Data" in df_pivot.columns:
                     for i, row in df_pivot.iterrows():
                         if pd.notna(row.get("Additional Data")):
@@ -77,11 +93,7 @@ if uploaded_file:
                 st.download_button("⬇️ Download CSV", csv, file_name="iso8583_fields.csv", mime="text/csv")
 
         # T057 fixed-width
-        elif (
-            filename.endswith(".001") or
-            filename.startswith("t057") or
-            filename.endswith(".t057")
-        ):
+        elif filename.endswith(".001") or filename.startswith("t057"):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             lines = content.splitlines()
             df = parse_t057_fixed_width(lines)
@@ -92,7 +104,7 @@ if uploaded_file:
             csv = df.to_csv(index=False).encode("utf-8")
             st.download_button("⬇️ Download CSV", csv, file_name="t057_parsed.csv", mime="text/csv")
 
-        # T113 file
+        # T113
         elif "t113" in filename:
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             lines = content.splitlines()
@@ -100,22 +112,28 @@ if uploaded_file:
 
             st.success("✅ T113 acknowledgment file parsed successfully")
             st.dataframe(df)
+            st.download_button("⬇️ Download CSV", df.to_csv(index=False).encode("utf-8"), "t113_parsed.csv")
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download CSV", csv, file_name="t113_parsed.csv", mime="text/csv")
-
-        # IPM Message Dump
+        # IPM
         elif "ipm" in filename and filename.endswith(".txt"):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             df = parse_ipm_text_dump(content)
 
             st.success("✅ IPM message dump parsed successfully")
             st.dataframe(df)
+            st.download_button("⬇️ Download CSV", df.to_csv(index=False).encode("utf-8"), "ipm_parsed.csv")
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download CSV", csv, file_name="ipm_parsed.csv", mime="text/csv")
+        # Visa NI / KUDA file
+        elif "kuda" in filename or "visa" in filename:
+            df = parse_visa_ni_file(uploaded_file)
 
-        # Binary file fallback
+            st.success("✅ Visa NI file parsed successfully (PANs masked)")
+            st.dataframe(df)
+
+            st.download_button("⬇️ Export CSV", df.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
+            st.download_button("⬇️ Export JSON", df.to_json(orient="records"), "visa_ni.json", mime="application/json")
+
+        # Fallback
         else:
             st.subheader("📦 Binary File Summary")
             df_bin = parse_binary_file(uploaded_file)
