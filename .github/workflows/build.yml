@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Finconv EXE
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Set up Python
@@ -20,15 +20,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install streamlit
-        pip install pyinstaller
+        pip install pandas chardet pyinstaller
 
-    - name: Build EXE
+    - name: Build the EXE
       run: |
         pyinstaller file_format_analyzer.py --onefile --noconsole
 
-    - name: Upload EXE
+    - name: Upload EXE Artifact
       uses: actions/upload-artifact@v4
       with:
         name: finconv-file-format-analyzer-exe
