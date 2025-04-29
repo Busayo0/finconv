@@ -144,10 +144,21 @@ if uploaded_file:
                         delta=f"{row['Count']} txns"
                     )
             
-            # ✅ Format amount in breakdown table
+           # Format summary table values
             df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
+            df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
             
-            # ✅ Show full breakdown after
+            # Show metrics first
+            cols = st.columns(len(df_summary))
+            for i, row in df_summary.iterrows():
+                with cols[i]:
+                    st.metric(
+                        label=row["Transaction Type"],
+                        value=row["Total Amount"],
+                        delta=f"{row['Count']} txns"
+                    )
+            
+            # Show formatted breakdown table
             st.dataframe(df_summary)
 
         
