@@ -106,55 +106,54 @@ if uploaded_file:
             st.download_button("⬇️ Download CSV", df.to_csv(index=False).encode("utf-8"), "ipm_parsed.csv")
 
         # Visa NI / KUDA
-        elif "kuda" in filename or "visa" in filename:
-            df, df_export = parse_visa_ni_file(uploaded_file)
+    elif "kuda" in filename or "visa" in filename:
+    df, df_export = parse_visa_ni_file(uploaded_file)
 
-            st.success("✅ Visa NI file parsed successfully (PANs masked)")
-            st.dataframe(df_export)
+    # ✅ Export buttons first (optional)
+    st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
+    st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
 
-            st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
-            st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
+    # ✅ Summary BEFORE the table
+    st.subheader("📊 Transaction Summary")
 
-            st.subheader("📊 Transaction Summary")
+    category_map = {
+        "05": "POS", "06": "Merchant Refunds", "07": "ATM",
+        "25": "POS Reversal", "27": "ATM Reversal",
+        "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
+    }
 
-            category_map = {
-                "05": "POS", "06": "Merchant Refunds", "07": "ATM",
-                "25": "POS Reversal", "27": "ATM Reversal",
-                "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
-            }
+    df[5] = df[5].str.strip()
+    df[10] = pd.to_numeric(df[10], errors="coerce") / 100
 
-            df[5] = df[5].str.strip()
-            df[10] = pd.to_numeric(df[10], errors="coerce") / 100
+    summary = []
+    for key, label in category_map.items():
+        matched = df[df[5] == key]
+        count = len(matched)
+        total = matched[10].sum()
+        summary.append({
+            "Transaction Type": label,
+            "Count": count,
+            "Total Amount": total
+        })
 
-            summary = []
-            for key, label in category_map.items():
-                matched = df[df[5] == key]
-                count = len(matched)
-                total = matched[10].sum()
-                summary.append({
-                    "Transaction Type": label,
-                    "Count": count,
-                    "Total Amount": total
-                })
+    df_summary = pd.DataFrame(summary)
+    df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
+    df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
 
-            df_summary = pd.DataFrame(summary)
+    # ✅ Show summary cards first
+    cols = st.columns(len(df_summary))
+    for i, row in df_summary.iterrows():
+        with cols[i]:
+            st.metric(
+                label=row["Transaction Type"],
+                value=row["Total Amount"],
+                delta=f"{row['Count']} txns"
+            )
 
-            # ✅ Format for display
-            df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
-            df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
-
-            # ✅ Show metric cards
-            cols = st.columns(len(df_summary))
-            for i, row in df_summary.iterrows():
-                with cols[i]:
-                    st.metric(
-                        label=row["Transaction Type"],
-                        value=row["Total Amount"],
-                        delta=f"{row['Count']} txns"
-                    )
-
-            # ✅ Show formatted summary table
-            st.dataframe(df_summary)
+    # ✅ Full file table after summary
+    st.success("✅ Visa NI file parsed successfully (PANs masked)")
+    st.dataframe(df_export)
+        
         
         # Fallback
         else:
