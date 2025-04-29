@@ -135,10 +135,10 @@ if uploaded_file:
             df_summary = pd.DataFrame(summary)
 
             cols = st.columns(len(df_summary))
-            for i, row in enumerate(df_summary.itertuples()):
+            for i, row in df_summary.iterrows():
                 with cols[i]:
-                    st.metric(label=row._1, value=f"₦{row._3:,.2f}", delta=f"{row._2} txns")
-
+                    st.metric(label=row["Transaction Type"], value=f"₦{row['Total Amount']:,.2f}", delta=f"{row['Count']} txns")
+            
             st.dataframe(df_summary)
 
         # Fallback
