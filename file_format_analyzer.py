@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from converters.t057 import parse_t057_fixed_width
@@ -5,25 +6,6 @@ from converters.iso8583 import parse_iso8583_xml, decode_field_48
 from converters.t113 import parse_t113_fixed_width
 from converters.ipm import parse_ipm_text_dump
 from converters.visa_ni import parse_visa_ni_file
-
-
-# ---------------- Visa NI Parser -------------------
-def parse_visa_ni_file(uploaded_file):
-    lines = [line.strip() for line in uploaded_file.readlines() if line.strip()]
-
-    def mask_pan(pan: str) -> str:
-        return pan[:4] + '*' * (len(pan) - 8) + pan[-4:] if len(pan) >= 10 else '*' * len(pan)
-
-    parsed_rows = []
-    for line in lines:
-        parts = line.decode("utf-8", errors="ignore").split("|")
-        if parts:
-            parts[0] = mask_pan(parts[0])
-        parsed_rows.append(parts)
-
-    df = pd.DataFrame(parsed_rows)
-    df_export = pd.concat([pd.DataFrame([[""] * len(df.columns)]), df], ignore_index=True)
-    return df_export
 
 # ---------------- Binary Fallback -------------------
 def parse_binary_file(uploaded_file):
@@ -92,7 +74,7 @@ if uploaded_file:
                 csv = df_pivot.to_csv(index=False).encode("utf-8")
                 st.download_button("⬇️ Download CSV", csv, file_name="iso8583_fields.csv", mime="text/csv")
 
-        # T057 fixed-width
+        # T057
         elif filename.endswith(".001") or filename.startswith("t057"):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             lines = content.splitlines()
@@ -123,71 +105,41 @@ if uploaded_file:
             st.dataframe(df)
             st.download_button("⬇️ Download CSV", df.to_csv(index=False).encode("utf-8"), "ipm_parsed.csv")
 
-        # Visa NI / KUDA file
-       elif "kuda" in filename or "visa" in filename:
-    def parse_visa_ni_file(uploaded_file):
-        lines = [line.strip() for line in uploaded_file.readlines() if line.strip()]
+        # Visa NI / KUDA
+        elif "kuda" in filename or "visa" in filename:
+            df, df_export = parse_visa_ni_file(uploaded_file)
 
-        def mask_pan(pan: str) -> str:
-            return pan[:4] + '*' * (len(pan) - 8) + pan[-4:] if len(pan) >= 10 else '*' * len(pan)
+            st.success("✅ Visa NI file parsed successfully (PANs masked)")
+            st.dataframe(df_export)
 
-        parsed_rows = []
-        for line in lines:
-            parts = line.decode("utf-8", errors="ignore").split("|")
-            if parts:
-                parts[0] = mask_pan(parts[0])
-            parsed_rows.append(parts)
+            st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
+            st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
 
-        df = pd.DataFrame(parsed_rows)
-        df_export = pd.concat([pd.DataFrame([[""] * len(df.columns)]), df], ignore_index=True)
-        return df, df_export
+            st.subheader("📊 Transaction Summary")
+            category_map = {
+                "05": "POS", "06": "Merchant Refunds", "07": "ATM",
+                "25": "POS Reversal", "27": "ATM Reversal",
+                "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
+            }
 
-    # Run parser
-    df, df_export = parse_visa_ni_file(uploaded_file)
+            df[5] = df[5].str.strip()
+            df[10] = pd.to_numeric(df[10], errors="coerce") / 100
 
-    st.success("✅ Visa NI file parsed successfully (PANs masked)")
-    st.dataframe(df_export)
+            summary = []
+            for key, label in category_map.items():
+                matched = df[df[5] == key]
+                count = len(matched)
+                total = matched[10].sum()
+                summary.append({"Transaction Type": label, "Count": count, "Total Amount": total})
 
-    st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
-    st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
+            df_summary = pd.DataFrame(summary)
 
-    # ===================== Summary ======================
-    st.subheader("📊 Transaction Summary")
+            cols = st.columns(len(df_summary))
+            for i, row in enumerate(df_summary.itertuples()):
+                with cols[i]:
+                    st.metric(label=row._1, value=f"₦{row._3:,.2f}", delta=f"{row._2} txns")
 
-    category_map = {
-        "05": "POS",
-        "06": "Merchant Refunds",
-        "07": "ATM",
-        "25": "POS Reversal",
-        "27": "ATM Reversal",
-        "CradJ": "Credit Adjustment",
-        "TFee": "Transaction Fee"
-    }
-
-    df[5] = df[5].str.strip()
-    df[10] = pd.to_numeric(df[10], errors="coerce") / 100
-
-    summary = []
-    for key, label in category_map.items():
-        matched = df[df[5] == key]
-        count = len(matched)
-        total = matched[10].sum()
-        summary.append({
-            "Transaction Type": label,
-            "Count": count,
-            "Total Amount": total
-        })
-
-    df_summary = pd.DataFrame(summary)
-
-    # Display metrics
-    cols = st.columns(len(df_summary))
-    for i, row in enumerate(df_summary.itertuples()):
-        with cols[i]:
-            st.metric(label=row._1, value=f"₦{row._3:,.2f}", delta=f"{row._2} txns")
-
-    # Full breakdown
-    st.dataframe(df_summary)
+            st.dataframe(df_summary)
 
         # Fallback
         else:
