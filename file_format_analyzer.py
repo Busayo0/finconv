@@ -124,14 +124,70 @@ if uploaded_file:
             st.download_button("⬇️ Download CSV", df.to_csv(index=False).encode("utf-8"), "ipm_parsed.csv")
 
         # Visa NI / KUDA file
-        elif "kuda" in filename or "visa" in filename:
-            df = parse_visa_ni_file(uploaded_file)
+       elif "kuda" in filename or "visa" in filename:
+    def parse_visa_ni_file(uploaded_file):
+        lines = [line.strip() for line in uploaded_file.readlines() if line.strip()]
 
-            st.success("✅ Visa NI file parsed successfully (PANs masked)")
-            st.dataframe(df)
+        def mask_pan(pan: str) -> str:
+            return pan[:4] + '*' * (len(pan) - 8) + pan[-4:] if len(pan) >= 10 else '*' * len(pan)
 
-            st.download_button("⬇️ Export CSV", df.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
-            st.download_button("⬇️ Export JSON", df.to_json(orient="records"), "visa_ni.json", mime="application/json")
+        parsed_rows = []
+        for line in lines:
+            parts = line.decode("utf-8", errors="ignore").split("|")
+            if parts:
+                parts[0] = mask_pan(parts[0])
+            parsed_rows.append(parts)
+
+        df = pd.DataFrame(parsed_rows)
+        df_export = pd.concat([pd.DataFrame([[""] * len(df.columns)]), df], ignore_index=True)
+        return df, df_export
+
+    # Run parser
+    df, df_export = parse_visa_ni_file(uploaded_file)
+
+    st.success("✅ Visa NI file parsed successfully (PANs masked)")
+    st.dataframe(df_export)
+
+    st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), "visa_ni.csv", mime="text/csv")
+    st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
+
+    # ===================== Summary ======================
+    st.subheader("📊 Transaction Summary")
+
+    category_map = {
+        "05": "POS",
+        "06": "Merchant Refunds",
+        "07": "ATM",
+        "25": "POS Reversal",
+        "27": "ATM Reversal",
+        "CradJ": "Credit Adjustment",
+        "TFee": "Transaction Fee"
+    }
+
+    df[5] = df[5].str.strip()
+    df[10] = pd.to_numeric(df[10], errors="coerce") / 100
+
+    summary = []
+    for key, label in category_map.items():
+        matched = df[df[5] == key]
+        count = len(matched)
+        total = matched[10].sum()
+        summary.append({
+            "Transaction Type": label,
+            "Count": count,
+            "Total Amount": total
+        })
+
+    df_summary = pd.DataFrame(summary)
+
+    # Display metrics
+    cols = st.columns(len(df_summary))
+    for i, row in enumerate(df_summary.itertuples()):
+        with cols[i]:
+            st.metric(label=row._1, value=f"₦{row._3:,.2f}", delta=f"{row._2} txns")
+
+    # Full breakdown
+    st.dataframe(df_summary)
 
         # Fallback
         else:
