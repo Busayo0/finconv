@@ -1,24 +1,38 @@
 import pandas as pd
+from io import StringIO
 
 def parse_visa_ni_file(uploaded_file):
-    """
-    Parse a pipe-delimited Visa NI file, mask PANs (column 0), and return:
-    - df: the cleaned DataFrame
-    - df_export: the export-ready DataFrame (with blank row, no headers)
-    """
-    lines = [line.strip() for line in uploaded_file.readlines() if line.strip()]
+    '''
+    Optimized Visa NI parser:
+    - Reads and decodes file fast
+    - Masks PAN (column 0)
+    - Returns:
+        - df: clean working DataFrame
+        - df_export: version with blank row, no headers
+    '''
+    # Decode and split file into lines
+    content = uploaded_file.read().decode("utf-8", errors="ignore")
+    lines = content.splitlines()
 
     def mask_pan(pan: str) -> str:
-        return pan[:4] + '*' * (len(pan) - 8) + pan[-4:] if len(pan) >= 10 else '*' * len(pan)
+        if len(pan) >= 10:
+            return pan[:4] + '*' * (len(pan) - 8) + pan[-4:]
+        return '*' * len(pan)
 
-    parsed_rows = []
+    # Transform each line and mask PAN
+    masked_lines = []
     for line in lines:
-        parts = line.decode("utf-8", errors="ignore").split("|")
-        if parts:
-            parts[0] = mask_pan(parts[0])
-        parsed_rows.append(parts)
+        if "|" not in line:
+            continue
+        parts = line.split("|", maxsplit=15)
+        parts[0] = mask_pan(parts[0])
+        masked_lines.append("|".join(parts))
 
-    df = pd.DataFrame(parsed_rows)
-    df_export = pd.concat([pd.DataFrame([[""] * len(df.columns)]), df], ignore_index=True)
+    # Load into DataFrame using fast buffer
+    buffer = StringIO("\n".join(masked_lines))
+    df = pd.read_csv(buffer, sep="|", header=None, dtype=str)
+
+    # Add a blank row for export format
+    df_export = pd.concat([pd.DataFrame([[""] * df.shape[1]]), df], ignore_index=True)
 
     return df, df_export
