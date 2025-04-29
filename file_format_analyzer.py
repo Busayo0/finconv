@@ -134,13 +134,23 @@ if uploaded_file:
 
             df_summary = pd.DataFrame(summary)
 
+            # ✅ Show summary cards first
             cols = st.columns(len(df_summary))
             for i, row in df_summary.iterrows():
                 with cols[i]:
-                    st.metric(label=row["Transaction Type"], value=f"₦{row['Total Amount']:,.2f}", delta=f"{row['Count']} txns")
+                    st.metric(
+                        label=row["Transaction Type"],
+                        value=f"₦{row['Total Amount']:,.2f}",
+                        delta=f"{row['Count']} txns"
+                    )
             
+            # ✅ Format amount in breakdown table
+            df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
+            
+            # ✅ Show full breakdown after
             st.dataframe(df_summary)
 
+        
         # Fallback
         else:
             st.subheader("📦 Binary File Summary")
