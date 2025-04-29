@@ -116,6 +116,7 @@ if uploaded_file:
             st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), "visa_ni.json", mime="application/json")
 
             st.subheader("📊 Transaction Summary")
+
             category_map = {
                 "05": "POS", "06": "Merchant Refunds", "07": "ATM",
                 "25": "POS Reversal", "27": "ATM Reversal",
@@ -130,25 +131,19 @@ if uploaded_file:
                 matched = df[df[5] == key]
                 count = len(matched)
                 total = matched[10].sum()
-                summary.append({"Transaction Type": label, "Count": count, "Total Amount": total})
+                summary.append({
+                    "Transaction Type": label,
+                    "Count": count,
+                    "Total Amount": total
+                })
 
             df_summary = pd.DataFrame(summary)
 
-            # ✅ Show summary cards first
-            cols = st.columns(len(df_summary))
-            for i, row in df_summary.iterrows():
-                with cols[i]:
-                    st.metric(
-                        label=row["Transaction Type"],
-                        value=f"₦{row['Total Amount']:,.2f}",
-                        delta=f"{row['Count']} txns"
-                    )
-            
-           # Format summary table values
+            # ✅ Format for display
             df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
             df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
-            
-            # Show metrics first
+
+            # ✅ Show metric cards
             cols = st.columns(len(df_summary))
             for i, row in df_summary.iterrows():
                 with cols[i]:
@@ -157,10 +152,9 @@ if uploaded_file:
                         value=row["Total Amount"],
                         delta=f"{row['Count']} txns"
                     )
-            
-            # Show formatted breakdown table
-            st.dataframe(df_summary)
 
+            # ✅ Show formatted summary table
+            st.dataframe(df_summary)
         
         # Fallback
         else:
