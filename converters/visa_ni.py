@@ -10,7 +10,6 @@ def parse_visa_ni_file(uploaded_file):
         - df: clean working DataFrame
         - df_export: version with blank row, no headers
     '''
-    # Decode and split file into lines
     content = uploaded_file.read().decode("utf-8", errors="ignore")
     lines = content.splitlines()
 
@@ -19,7 +18,7 @@ def parse_visa_ni_file(uploaded_file):
             return pan[:4] + '*' * (len(pan) - 8) + pan[-4:]
         return '*' * len(pan)
 
-    # Transform each line and mask PAN
+    # Inline transformation
     masked_lines = []
     for line in lines:
         if "|" not in line:
@@ -28,11 +27,11 @@ def parse_visa_ni_file(uploaded_file):
         parts[0] = mask_pan(parts[0])
         masked_lines.append("|".join(parts))
 
-    # Load into DataFrame using fast buffer
+    # Load to DataFrame via StringIO
     buffer = StringIO("\n".join(masked_lines))
     df = pd.read_csv(buffer, sep="|", header=None, dtype=str)
 
-    # Add a blank row for export format
+    # Add blank row for export version
     df_export = pd.concat([pd.DataFrame([[""] * df.shape[1]]), df], ignore_index=True)
 
-    return df, df_export
+    return df,
