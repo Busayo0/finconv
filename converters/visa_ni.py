@@ -34,4 +34,4 @@ def parse_visa_ni_file(uploaded_file):
     # Add blank row for export version
     df_export = pd.concat([pd.DataFrame([[""] * df.shape[1]]), df], ignore_index=True)
 
-    return df,
+   return df, df_export
