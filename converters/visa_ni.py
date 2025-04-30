@@ -5,6 +5,7 @@ def parse_visa_ni_file(uploaded_file):
     '''
     Optimized Visa NI parser:
     - Reads and decodes file fast
+    - Handles rows with extra/missing columns (ragged rows)
     - Masks PAN (column 0)
     - Returns:
         - df: clean working DataFrame
@@ -22,12 +23,14 @@ def parse_visa_ni_file(uploaded_file):
     for line in lines:
         if "|" not in line:
             continue
-        parts = line.split("|", maxsplit=15)
+        parts = line.split("|", maxsplit=60)  # generous maxsplit to handle longer lines
         parts[0] = mask_pan(parts[0])
         masked_lines.append("|".join(parts))
 
     buffer = StringIO("\n".join(masked_lines))
-    df = pd.read_csv(buffer, sep="|", header=None, dtype=str)
+
+    # ✅ Use engine="python" to allow variable-length rows
+    df = pd.read_csv(buffer, sep="|", header=None, dtype=str, engine="python")
 
     df_export = pd.concat([pd.DataFrame([[""] * df.shape[1]]), df], ignore_index=True)
 
