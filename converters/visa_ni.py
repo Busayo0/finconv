@@ -1,15 +1,14 @@
 import pandas as pd
-from io import StringIO
 
 def parse_visa_ni_file(uploaded_file):
     '''
-    Optimized Visa NI parser:
-    - Reads and decodes file fast
-    - Handles rows with extra/missing columns (ragged rows)
+    Visa NI parser (fully tolerant):
+    - Handles inconsistent column counts
     - Masks PAN (column 0)
+    - Pads rows to max length
     - Returns:
-        - df: clean working DataFrame
-        - df_export: version with blank row, no headers
+        - df: parsed DataFrame
+        - df_export: exportable version with blank first row
     '''
     content = uploaded_file.read().decode("utf-8", errors="ignore")
     lines = content.splitlines()
@@ -19,19 +18,24 @@ def parse_visa_ni_file(uploaded_file):
             return pan[:4] + '*' * (len(pan) - 8) + pan[-4:]
         return '*' * len(pan)
 
-    masked_lines = []
+    masked_rows = []
+    max_cols = 0
+
     for line in lines:
         if "|" not in line:
             continue
-        parts = line.split("|", maxsplit=60)  # generous maxsplit to handle longer lines
+        parts = line.split("|")
         parts[0] = mask_pan(parts[0])
-        masked_lines.append("|".join(parts))
+        masked_rows.append(parts)
+        max_cols = max(max_cols, len(parts))
 
-    buffer = StringIO("\n".join(masked_lines))
+    # Pad rows to match max column count
+    padded_rows = [row + [""] * (max_cols - len(row)) for row in masked_rows]
 
-    # ✅ Use engine="python" to allow variable-length rows
-    df = pd.read_csv(buffer, sep="|", header=None, dtype=str, engine="python")
+    # Create DataFrame
+    df = pd.DataFrame(padded_rows)
 
-    df_export = pd.concat([pd.DataFrame([[""] * df.shape[1]]), df], ignore_index=True)
+    # Add blank first row for export
+    df_export = pd.concat([pd.DataFrame([[""] * max_cols]), df], ignore_index=True)
 
     return df, df_export
