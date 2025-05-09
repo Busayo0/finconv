@@ -115,7 +115,7 @@ if uploaded_file:
             st.subheader("📊 Transaction Summary")
 
             category_map = {
-                "05": "POS", "06": "Merchant Refunds", "07": "ATM",
+                "5": "POS", "6": "Merchant Refunds", "7": "ATM",
                 "25": "POS Reversal", "27": "ATM Reversal",
                 "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
             }
