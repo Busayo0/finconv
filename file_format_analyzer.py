@@ -107,63 +107,63 @@ if uploaded_file:
 
         # Visa NI / KUDA
         elif "kuda" in filename or "visa" in filename:
-        df, df_export = parse_visa_ni_file(uploaded_file)
-
-        # ✅ Extract date from column 12 and format as "NI Report 8th May 2025"
-        raw_date = df[12].iloc[0] if 12 in df.columns else ""
-        try:
-            date_obj = pd.to_datetime(raw_date, format="%Y%m%d")
-            day = int(date_obj.strftime("%d"))
-            suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-            formatted_date = f"NI Report {day}{suffix} {date_obj.strftime('%B %Y')}"
-        except:
-            formatted_date = "NI Report"
+            df, df_export = parse_visa_ni_file(uploaded_file)
     
-        csv_filename = f"{formatted_date}.csv"
-        json_filename = f"{formatted_date}.json"
-    
-        # ✅ Show summary first
-        st.subheader("📊 Transaction Summary")
-    
-        category_map = {
-            "5": "POS", "6": "Merchant Refunds", "7": "ATM",
-            "25": "POS Reversal", "27": "ATM Reversal",
-            "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
-        }
-    
-        df[5] = df[5].str.strip()
-        df[10] = pd.to_numeric(df[10], errors="coerce") / 100
-    
-        summary = []
-        for key, label in category_map.items():
-            matched = df[df[5] == key]
-            count = len(matched)
-            total = matched[10].sum()
-            summary.append({
-                "Transaction Type": label,
-                "Count": count,
-                "Total Amount": total
-            })
-    
-        df_summary = pd.DataFrame(summary)
-        df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
-        df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
-    
-        # ✅ Metric Cards
-        cols = st.columns(len(df_summary))
-        for i, row in df_summary.iterrows():
-            with cols[i]:
-                st.metric(
-                    label=row["Transaction Type"],
-                    value=row["Total Amount"],
-                    delta=f"{row['Count']} txns"
-                )
-    
-        # ✅ Show full data and summary table
-        st.success("✅ Visa NI file parsed successfully (PANs masked)")
-        st.dataframe(df_export)
-        st.dataframe(df_summary)
-    
-        # ✅ Downloads with formatted name
-        st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), file_name=csv_filename, mime="text/csv")
-        st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), file_name=json_filename, mime="application/json")
+            # ✅ Extract date from column 12 and format as "NI Report 8th May 2025"
+            raw_date = df[12].iloc[0] if 12 in df.columns else ""
+            try:
+                date_obj = pd.to_datetime(raw_date, format="%Y%m%d")
+                day = int(date_obj.strftime("%d"))
+                suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+                formatted_date = f"NI Report {day}{suffix} {date_obj.strftime('%B %Y')}"
+            except:
+                formatted_date = "NI Report"
+        
+            csv_filename = f"{formatted_date}.csv"
+            json_filename = f"{formatted_date}.json"
+        
+            # ✅ Show summary first
+            st.subheader("📊 Transaction Summary")
+        
+            category_map = {
+                "5": "POS", "6": "Merchant Refunds", "7": "ATM",
+                "25": "POS Reversal", "27": "ATM Reversal",
+                "CradJ": "Credit Adjustment", "TFee": "Transaction Fee"
+            }
+        
+            df[5] = df[5].str.strip()
+            df[10] = pd.to_numeric(df[10], errors="coerce") / 100
+        
+            summary = []
+            for key, label in category_map.items():
+                matched = df[df[5] == key]
+                count = len(matched)
+                total = matched[10].sum()
+                summary.append({
+                    "Transaction Type": label,
+                    "Count": count,
+                    "Total Amount": total
+                })
+        
+            df_summary = pd.DataFrame(summary)
+            df_summary["Total Amount"] = df_summary["Total Amount"].map(lambda x: f"₦{x:,.2f}")
+            df_summary["Count"] = df_summary["Count"].map(lambda x: f"{x:,}")
+        
+            # ✅ Metric Cards
+            cols = st.columns(len(df_summary))
+            for i, row in df_summary.iterrows():
+                with cols[i]:
+                    st.metric(
+                        label=row["Transaction Type"],
+                        value=row["Total Amount"],
+                        delta=f"{row['Count']} txns"
+                    )
+        
+            # ✅ Show full data and summary table
+            st.success("✅ Visa NI file parsed successfully (PANs masked)")
+            st.dataframe(df_export)
+            st.dataframe(df_summary)
+        
+            # ✅ Downloads with formatted name
+            st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), file_name=csv_filename, mime="text/csv")
+            st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), file_name=json_filename, mime="application/json")
