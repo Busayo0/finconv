@@ -107,7 +107,7 @@ if uploaded_file:
 
         # Visa NI / KUDA
         elif "kuda" in filename or "visa" in filename:
-    df, df_export = parse_visa_ni_file(uploaded_file)
+        df, df_export = parse_visa_ni_file(uploaded_file)
 
     # ✅ Extract date from column 12 and format as "NI Report 8th May 2025"
     raw_date = df[12].iloc[0] if 12 in df.columns else ""
@@ -167,7 +167,3 @@ if uploaded_file:
     # ✅ Downloads with formatted name
     st.download_button("⬇️ Export CSV", df_export.to_csv(index=False, header=False).encode("utf-8"), file_name=csv_filename, mime="text/csv")
     st.download_button("⬇️ Export JSON", df_export.to_json(orient="records"), file_name=json_filename, mime="application/json")
-
-
-
-
